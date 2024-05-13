@@ -1,13 +1,8 @@
-const information = document.getElementById('info')
-information.innerText = `This app is using Chrome (v${window.versions.chrome()}), Node.js (v${window.versions.node()}), and Electron (v${window.versions.electron()})`
-
-
+const btn = document.querySelector("#btn")
 
 const func = async ()=>{
-    alert("helo")
-    const title = document.getElementById("title").value
-    const response = await window.versions.setTitle(title)
+    const response = await window.actions.openFile()
+    alert(response)
 }
 
-const setTitleButton = document.getElementById("setTitle")
-setTitleButton.addEventListener("click",func)
+btn.addEventListener("click",func)

@@ -23,7 +23,6 @@
     "electron": "^30.0.3"
   },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.0",
-    "node-7z": "^3.0.0"
+    "electron-squirrel-startup": "^1.0.0"
   }
 }

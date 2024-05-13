@@ -1,37 +1,44 @@
 const { exec } = require('node:child_process');
-const https = require("node:https")
 const fs = require("node:fs")
 const path = require('node:path')
 
 const { app, BrowserWindow, ipcMain, dialog } = require('electron/main')
 
-const Seven = require("node-7z")
-
-const ffmpegUrl = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-2024-05-13-git-37db0454e4-full_build.7z"
+// const Zip = require("node-7z")
 
 //.\\ffmpeg\\bin\\ffmpeg.exe -h
 // ffmpeg -i input.mp4 -vcodec libx265 -crf 28 output.mp4
 
-function UnzipFFMPEG() {
-    return new Promise(resolve => {
-        try {
-            const myStream = Seven.extractFull('./ffmpeg-git-full.7z', './', {
-                $progress: true
-            })
-            myStream.on("end",()=>{
-                console.log(myStream.info.get("Folders"))
-                resolve(myStream.info.get("Folders"))
-            })
+async function runFFMPEGCcommand(path,filename){
+    return new Promise(resolve=>{
+        exec(`.\\resources\\ffmpeg\\bin\\ffmpeg.exe -i ${path} -vcodec libx265 -crf 28 ${path}min.mp4`, (err, stdout, stderr) => {
+            if (err) {
+                resolve(false)
+                return;
+            }
+            console.log(stdout)
+            resolve(`stdout: ${stdout}`)
             
-        } catch (err) {
-            console.log(err)
-        }
+        });
     })
 }
 
+async function handleFileOpen () {
+    const { canceled, filePaths } = await dialog.showOpenDialog()
+    if (!canceled) {
+        let filename = filePaths[0].split("\\")
+        filename = filename[filename.length-1]
+        if(await runFFMPEGCcommand(filePaths,filename)){
+            return filePaths[0]
+        }else{
+            return "warn"
+        }
+    }
+  }
+
 function FFMPEGIsExist() {
     return new Promise((resolve) => {
-        exec(`dir ffmpeg`, (err, stdout, stderr) => {
+        exec(`dir resources\\ffmpeg`, (err, stdout, stderr) => {
             if (err) {
                 resolve(false)
                 return;
@@ -40,27 +47,7 @@ function FFMPEGIsExist() {
         });
     })
 }
-function DownloadFFMPEG() {
-    return new Promise((resolve) => {
-        https.get(ffmpegUrl, res => {
-            const pathToSave = path.join(__dirname, "ffmpeg-git-full.7z")
-            const filePath = fs.createWriteStream(pathToSave)
-            res.pipe(filePath)
-            filePath.on("finish", () => {
-                filePath.close()
-                console.log("downloaded")
-                resolve(true)
-            })
-        })
-    })
-}
 
-
-async function openFile() {
-    const { canceled, filePaths } = await dialog.showOpenDialog()
-    console.log(filePaths)
-
-}
 
 const createWindow = () => {
     const mainWindow = new BrowserWindow({
@@ -82,12 +69,12 @@ const createWindow = () => {
 
 app.whenReady().then(async () => {
     const ffmpegisExist = await FFMPEGIsExist()
-    if (!ffmpegisExist) {
-        // const downloadFFmpeg = await DownloadFFMPEG()
-        // await UnzipFFMPEG()
+    if (ffmpegisExist) {
+        ipcMain.handle('openFile', handleFileOpen)
+        createWindow()
+    }else{
+        app.quit()
     }
-    createWindow()
-    // openFile()
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
