@@ -10,6 +10,7 @@ const Seven = require("node-7z")
 const ffmpegUrl = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-2024-05-13-git-37db0454e4-full_build.7z"
 
 //.\\ffmpeg\\bin\\ffmpeg.exe -h
+// ffmpeg -i input.mp4 -vcodec libx265 -crf 28 output.mp4
 
 function UnzipFFMPEG() {
     return new Promise(resolve => {
