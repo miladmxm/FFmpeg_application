@@ -1,10 +1,11 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Tray, nativeImage } from 'electron'
-import { join } from 'path'
+import path, { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ffmpegPath from 'ffmpeg-static'
-import icon from '../../resources/icon.png?asset'
 import { exec } from 'child_process'
+import { v4 as uuidv4 } from 'uuid'
 
+import icon from '../../resources/icon.png?asset'
 const ffmpegTruePath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
 
 function addMinToFileName(filename) {
@@ -18,7 +19,7 @@ async function runFFMPEGCcommand(filePath, srcfilename, filename) {
   const outFilename = filename ? filename : addMinToFileName(srcfilename)
   return new Promise((resolve) => {
     exec(
-      `${ffmpegTruePath} -i "${filePath}" -vcodec libx265 -crf 28 "${outFilePath}${outFilename}"`,
+      `${ffmpegTruePath} -i "${filePath}" -vcodec libx265 -crf 22 "${outFilePath}${outFilename}"`,
       (err, stdout) => {
         if (err) {
           resolve(false)
@@ -40,6 +41,41 @@ async function handleFileOpen() {
     } else {
       return 'warn'
     }
+  }
+}
+
+async function selectVideo() {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv'] }]
+  })
+  if (!canceled) {
+    let filename = filePaths[0].split('\\')
+    filename = filename[filename.length - 1]
+    const outFilename = addMinToFileName(filename)
+    const outFilePath = filePaths[0].replace(filename, '')
+    const id = uuidv4()
+
+    return { filePath: filePaths[0], filename, outFilename, outFilePath, id, crf: 22 }
+  }
+}
+
+async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    filters: [{ name: 'Videos', extensions: ['mp4'] }],
+    title: 'مسیر مدنظر و نام آن را مشخص کنید',
+    defaultPath,
+    buttonLabel: 'اینجا',
+    properties: ['promptToCreate']
+  })
+  if (!canceled) {
+    const resultFilePath = filePaths[0].split('\\')
+
+    const outFilename = resultFilePath[resultFilePath.length - 1]
+    const outFilePath = filePaths[0].replace(outFilename, '')
+    console.log(outFilename, outFilePath)
+    event.reply('selectDirectoryAndFileNameToSave', { outFilename, outFilePath, id })
+    return { outFilename, outFilePath }
   }
 }
 
@@ -92,7 +128,10 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.handle('openFile', handleFileOpen)
+
+  ipcMain.handle('selectVideo', selectVideo)
+  ipcMain.on('selectDirectoryAndFileNameToSave', selectDirectoryAndFileNameToSave)
+
   createWindow()
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
