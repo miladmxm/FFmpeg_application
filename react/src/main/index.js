@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Tray, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ffmpegPath from 'ffmpeg-static'
@@ -24,7 +24,6 @@ async function runFFMPEGCcommand(filePath, srcfilename, filename) {
           resolve(false)
           return
         }
-        console.log(stdout)
         resolve(`stdout: ${stdout}`)
       }
     )

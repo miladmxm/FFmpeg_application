@@ -2,9 +2,18 @@ import { useState } from 'react'
 
 function App() {
   const [log, setLog] = useState('')
-  const ipcHandle = () => window.electron.ipcRenderer.send('ping')
+  const [videos, setVideos] = useState({})
+  console.log(videos)
+
+  // const ipcHandle = () => window.electron.ipcRenderer.send('ping')
   window.electron.ipcRenderer.on('path', (_, args) => {
     setLog(args)
+  })
+
+  window.electron.ipcRenderer.on('srcVideo', (_, args) => {
+    setVideos((prev) => {
+      return { ...prev, [args.id]: args.src }
+    })
   })
 
   function submitForm(e) {
@@ -13,17 +22,26 @@ function App() {
   }
   return (
     <>
-      <main className="w-screen  h-screen bg-black-soft text-text-1 p-4">
-        <form onSubmit={submitForm}>
-          <button type="button">ویدیو خود را انتخاب کنید</button>
-          <input type="text" name="text" id="" />
+      <main className="w-screen  flex flex-col gap-10 h-screen bg-black-soft text-text-1 p-4">
+        <form onSubmit={submitForm} className="flex flex-col gap-6 items-center">
+          <button className="p-3 rounded-lg bg-slate-600 w-fit" type="button">
+            ویدیو خود را انتخاب کنید
+          </button>
+          <input className='bg-transparent' type="text" name="text" id="" />
           <button type="submit">submit</button>
         </form>
         <section className="border-2 rounded-xl border-gray-3">
           <ul className="flex flex-col">
-            <li>fdsfsd</li>
-            <li>fdsfsd</li>
-            <li>fdsfsd</li>
+            {Object.keys(videos).map((videoKey) => {
+              const video = videos[videoKey]
+              return (
+                <li key={videoKey}>
+                  <video controls>
+                    <source src={video.src} />
+                  </video>
+                </li>
+              )
+            })}
           </ul>
         </section>
       </main>
