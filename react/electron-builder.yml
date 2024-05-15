@@ -1,6 +1,6 @@
 appId: com.electron.app
 productName: ffmpeg_with_react
-icon: ./resources/icon.ico
+icon: resources/icon.ico
 directories:
   buildResources: build
 files:
@@ -13,7 +13,7 @@ asarUnpack:
   - resources/**
 win:
   executableName: ffmpeg_with_react
-  icon: D:\\Projects\\FFmpeg_application\\react\\build\\icon.ico
+  icon: resources/icon.ico
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
