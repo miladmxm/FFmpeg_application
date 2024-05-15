@@ -3,8 +3,18 @@
 @tailwind utilities;
 
 @layer base {
-    body{
-        @apply bg-black-soft;
-        direction: rtl;
-    }
+  body {
+    @apply bg-black-soft;
+    direction: rtl;
+  }
+  ::-webkit-scrollbar {
+    @apply w-1;
+    @apply rounded-xl;
+    @apply bg-black;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply w-1;
+    @apply bg-gray-2;
+    @apply rounded-xl;
+  }
 }

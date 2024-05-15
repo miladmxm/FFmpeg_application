@@ -20,7 +20,7 @@ function returnFileName(fullpath) {
   return filename[filename.length - 1]
 }
 
-async function runCRFffmpeg({ outFilePath, outFilename, filePath, crf, id }) {
+async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id }) {
   return new Promise((resolve) => {
     const child = spawn(ffmpegTruePath, [
       '-i',
@@ -43,7 +43,6 @@ async function runCRFffmpeg({ outFilePath, outFilename, filePath, crf, id }) {
     child.stderr.on('data', (data) => {
       const stringData = data.toString('utf-8')
       if (stdOUTCunter === 1) {
-        // console.error(`stderr: ${typeof data}`)
         const indexOfDurationInString = stringData.indexOf('Duration: ')
 
         const indexOfStartInString = stringData.indexOf(', start')
@@ -62,9 +61,9 @@ async function runCRFffmpeg({ outFilePath, outFilename, filePath, crf, id }) {
           if (!progress.startsWith('-')) {
             progress = progress.replaceAll(':', '')
             progress = Number(progress)
-            progress = Math.round((progress*100)/videoDuration)
-            // todo send progress to frontend
-            
+            progress = Math.round((progress * 100) / videoDuration)
+
+            event.reply('progress', { id, progress })
           }
         }
       }
@@ -78,17 +77,13 @@ async function runCRFffmpeg({ outFilePath, outFilename, filePath, crf, id }) {
       if (code === 0) {
         // todo send progress to frontend
         resolve(id)
+        event.reply('done', { id })
         console.log(`child process exited with code ${code}`)
       }
     })
   })
 }
-runCRFffmpeg({
-  outFilename: 'out.mp4',
-  outFilePath: 'C:\\Users\\Milad\\Desktop\\',
-  filePath: 'C:\\Users\\Milad\\Desktop\\Recording 2024-05-14 102147.mp4',
-  crf: 22
-})
+
 async function runRtbufsizeFfmpeg(filePath, srcfilename, filename) {
   const outFilePath = filePath.replace(filePath, '')
   const outFilename = filename ? filename : addMinToFileName(srcfilename)
@@ -105,19 +100,6 @@ async function runRtbufsizeFfmpeg(filePath, srcfilename, filename) {
       }
     )
   })
-}
-
-async function handleFileOpen() {
-  const { canceled, filePaths } = await dialog.showOpenDialog()
-  if (!canceled) {
-    let filename = filePaths[0].split('\\')
-    filename = filename[filename.length - 1]
-    if (await runFFMPEGCcommand(filePaths, filename)) {
-      return filePaths[0]
-    } else {
-      return 'warn'
-    }
-  }
 }
 
 async function selectVideo() {
@@ -204,8 +186,6 @@ function createWindow() {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -213,16 +193,8 @@ function createWindow() {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
@@ -232,6 +204,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('selectVideo', selectVideo)
   ipcMain.on('selectDirectoryAndFileNameToSave', selectDirectoryAndFileNameToSave)
+  ipcMain.on('startProcess', runCRFffmpeg)
 
   createWindow()
   app.on('activate', function () {

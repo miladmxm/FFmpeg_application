@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react'
+import { FaCheck, FaPause, FaPlay, FaTrash } from 'react-icons/fa'
 
+const numberRegex = /^\d+$/
 function App() {
-  const [log, setLog] = useState('')
   const [videos, setVideos] = useState({})
 
   useEffect(() => {
-    window.electron.ipcRenderer.on('path', (_, args) => {
-      setLog(args)
+    window.electron.ipcRenderer.on('progress', (_, args) => {
+      setVideos((prev) => {
+        return {
+          ...prev,
+          [args.id]: { ...prev[args.id], progress: args.progress }
+        }
+      })
+    })
+    window.electron.ipcRenderer.on('done', (_, args) => {
+      setVideos((prev) => {
+        return {
+          ...prev,
+          [args.id]: { ...prev[args.id], progress: 100, status: 'done' }
+        }
+      })
     })
     window.electron.ipcRenderer.on('selectDirectoryAndFileNameToSave', (_, args) => {
       console.log(args)
@@ -21,16 +35,65 @@ function App() {
     setVideos((prev) => {
       return { ...prev, [video.id]: { ...video } }
     })
-    console.log(video)
   }
 
   async function selectVideoOutPathAndName(id) {
+    if (videos[id].status && (videos[id].status === 'doing' || videos[id].status === 'done')) {
+      return
+    }
     await window.electron.ipcRenderer.send('selectDirectoryAndFileNameToSave', {
       defaultPath: `${videos[id].outFilePath}${videos[id].outFilename}`,
       id
     })
   }
 
+  function CRFinputChange(e, id) {
+    if (videos[id].status && (videos[id].status === 'doing' || videos[id].status === 'done')) {
+      return
+    }
+    if (
+      (numberRegex.test(e.target.value) && e.target.value >= 1 && e.target.value <= 51) ||
+      e.target.value === ''
+    ) {
+      setVideos((prev) => {
+        return {
+          ...prev,
+          [id]: {
+            ...prev[id],
+            crf: Number(e.target.value) > 0 ? Number(e.target.value) : ''
+          }
+        }
+      })
+    }
+  }
+
+  async function startProcess(id) {
+    const { status, crf, filePath, outFilePath, outFilename } = videos[id]
+    if (
+      (status && status === 'doing') ||
+      status === 'done' ||
+      !crf ||
+      crf === '' ||
+      crf < 1 ||
+      crf > 51
+    ) {
+      return
+    }
+    setVideos((pre) => {
+      return {
+        ...pre,
+        [id]: { ...pre[id], status: 'doing' }
+      }
+    })
+
+    await window.electron.ipcRenderer.send('startProcess', {
+      filePath,
+      outFilePath,
+      outFilename,
+      crf,
+      id
+    })
+  }
   function submitForm(e) {
     e.preventDefault()
     console.log(e)
@@ -51,13 +114,14 @@ function App() {
           <div className="flex flex-col gap-5">
             {Object.keys(videos).map((videoKey) => {
               const videoItem = videos[videoKey]
-        
-              // const src = 'data:image/jpeg;base64,' + videoItem.thumbnail.toString('base64')
               return (
-                <div className="border-gray-3 rounded-xl border-2 p-2" key={videoKey}>
+                <div
+                  className={`border-gray-3 rounded-xl border-2 p-2 ${videoItem.status === 'done' ? 'opacity-50 [&_*]:poi0nter-events-none' : ''}`}
+                  key={videoKey}
+                >
                   <div className="flex justify-between">
                     {/* <img src={src} alt="" /> */}
-                    <div className="flex-1 border-l border-solid max-w-[50%] p-2 flex gap-2">
+                    <div className="flex-1 border-l border-gray-1 border-solid max-w-[50%] p-2 flex gap-2">
                       <span className="text-white-mute font-light min-w-fit">نام:</span>
                       <span className="truncate">{videoItem.filename}</span>
                     </div>
@@ -70,7 +134,7 @@ function App() {
                     </div>
                   </div>
                   <div className="flex justify-between">
-                    <div className="flex-1 border-l border-solid max-w-[50%] p-2 flex gap-2">
+                    <div className="flex-1 border-l border-solid border-gray-1 max-w-[50%] p-2 flex gap-2">
                       <span className="text-white-mute font-light min-w-fit">آدرس ویدیو:</span>
                       <span className="truncate">{videoItem.filePath}</span>
                     </div>
@@ -82,41 +146,66 @@ function App() {
                       <span className="truncate">{videoItem.outFilePath}</span>
                     </div>
                   </div>
+                  <div className="border-t p-2 border-gray-1 border-solid space-y-4">
+                    <h6>تنظیمات:</h6>
+                    <div className="flex items-center justify-between gap-5">
+                      <div className="flex gap-2 items-center">
+                        <span>ضریب نرخ ثابت(CRF):</span>
+                        <input
+                          placeholder="یک عدد بین 1 تا 51"
+                          onChange={(e) => CRFinputChange(e, videoKey)}
+                          className={
+                            videoItem.crf === ''
+                              ? 'ring-red-400 outline-none border-none bg-transparent ring-2 p-1 rounded'
+                              : videoItem.crf > 17 && videoItem.crf < 29
+                                ? 'ring-green-400 outline-none border-none bg-transparent ring-2 p-1 rounded'
+                                : 'outline-none border-none bg-transparent ring-2 p-1 rounded'
+                          }
+                          type="text"
+                          value={videoItem.crf}
+                        />
+                      </div>
+                      <div className="flex gap-2 flex-auto items-center justify-end">
+                        {videoItem.status === 'doing' && (
+                          <div className="relative flex-auto h-1 bg-text-3 ">
+                            <div
+                              style={{ width: videoItem.progress + '%' }}
+                              className="absolute transition-all bg-[#3b82f680] left-0 h-full top-0"
+                            ></div>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          {videoItem.status === 'doing' ? (
+                            <button className="text-red-400">
+                              <FaPause />
+                            </button>
+                          ) : videoItem.status === 'done' ? (
+                            <>
+                              <FaCheck className="text-green-500" />
+                            </>
+                          ) : (
+                            <>
+                              <button className="text-red-400">
+                                <FaTrash />
+                              </button>
+                              <button
+                                onClick={() => startProcess(videoKey)}
+                                className="text-green-500"
+                              >
+                                <FaPlay />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )
             })}
           </div>
         </section>
       </main>
-      {/* 
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        {log}
-        <br />
-        Build an Electron app with <span className="react">React</span>
-      </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <button
-          onClick={() => {
-            window.electron.ipcRenderer.invoke('openFile')
-          }}
-        >
-          openFile
-        </button>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
-      </div> */}
     </>
   )
 }
