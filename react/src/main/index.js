@@ -1,8 +1,9 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Tray, nativeImage } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import fs from 'fs'
 import path, { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ffmpegPath from 'ffmpeg-static'
-import { exec } from 'child_process'
+import { exec, spawn } from 'child_process'
 import { v4 as uuidv4 } from 'uuid'
 
 import icon from '../../resources/icon.png?asset'
@@ -14,10 +15,97 @@ function addMinToFileName(filename) {
   return arrayOfName.join('')
 }
 
-async function runFFMPEGCcommand(filePath, srcfilename, filename) {
+function returnFileName(fullpath) {
+  let filename = fullpath.split('\\')
+  return filename[filename.length - 1]
+}
+
+async function runCRFffmpeg({ outFilePath, outFilename, filePath, crf, id }) {
+  return new Promise((resolve) => {
+    const child = spawn(ffmpegTruePath, [
+      '-i',
+      `${filePath}`,
+      '-vcodec',
+      'libx265',
+      '-crf',
+      `${crf}`,
+      `${outFilePath}${outFilename}`,
+      `-y`,
+      '-stats'
+    ])
+
+    let stdOUTCunter = 0
+    let videoDuration = 0
+    child.stdout.on('data', (data) => {
+      console.log(`stdout:\n${data}`)
+    })
+
+    child.stderr.on('data', (data) => {
+      const stringData = data.toString('utf-8')
+      if (stdOUTCunter === 1) {
+        // console.error(`stderr: ${typeof data}`)
+        const indexOfDurationInString = stringData.indexOf('Duration: ')
+
+        const indexOfStartInString = stringData.indexOf(', start')
+
+        const startSlice = indexOfDurationInString + 'Duration: '.length
+
+        videoDuration = stringData.slice(startSlice, indexOfStartInString)
+        videoDuration = videoDuration.replaceAll(':', '')
+        videoDuration = Number(videoDuration)
+      } else if (stdOUTCunter > 1) {
+        const startTimeIndex = stringData.indexOf('time=')
+        if (startTimeIndex !== -1) {
+          const bitrateForEndIndex = stringData.indexOf('bitrate')
+          const startSlice = startTimeIndex + 'time='.length
+          let progress = stringData.slice(startSlice, bitrateForEndIndex)
+          if (!progress.startsWith('-')) {
+            progress = progress.replaceAll(':', '')
+            progress = Number(progress)
+            progress = Math.round((progress*100)/videoDuration)
+            // todo send progress to frontend
+            
+          }
+        }
+      }
+      stdOUTCunter++
+    })
+    child.on('error', (error) => {
+      console.error(`error: ${error.message}`)
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        // todo send progress to frontend
+        resolve(id)
+        console.log(`child process exited with code ${code}`)
+      }
+    })
+
+    // exec(
+    //   `${ffmpegTruePath} -i "${filePath}" -vcodec libx265 -crf ${crf} "${outFilePath}${outFilename}"`,
+    //   (err, stdout) => {
+    //     console.log(stdout)
+    //     if (err) {
+    //       resolve(false)
+    //       return
+    //     }
+    //     resolve(`stdout: ${stdout}`)
+    //   }
+    // )
+  })
+}
+runCRFffmpeg({
+  outFilename: 'out.mp4',
+  outFilePath: 'C:\\Users\\Milad\\Desktop\\',
+  filePath: 'C:\\Users\\Milad\\Desktop\\Recording 2024-05-14 102147.mp4',
+  crf: 22
+})
+async function runRtbufsizeFfmpeg(filePath, srcfilename, filename) {
   const outFilePath = filePath.replace(filePath, '')
   const outFilename = filename ? filename : addMinToFileName(srcfilename)
   return new Promise((resolve) => {
+    // -rtbufsize 1M for custom size
     exec(
       `${ffmpegTruePath} -i "${filePath}" -vcodec libx265 -crf 22 "${outFilePath}${outFilename}"`,
       (err, stdout) => {
@@ -47,7 +135,7 @@ async function handleFileOpen() {
 async function selectVideo() {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
-    filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv'] }]
+    filters: [{ name: 'Videos', extensions: ['mp4'] }]
   })
   if (!canceled) {
     let filename = filePaths[0].split('\\')
@@ -55,8 +143,8 @@ async function selectVideo() {
     const outFilename = addMinToFileName(filename)
     const outFilePath = filePaths[0].replace(filename, '')
     const id = uuidv4()
-
-    return { filePath: filePaths[0], filename, outFilename, outFilePath, id, crf: 22 }
+    const thumbnail = await getThumbnail(filePaths[0])
+    return { filePath: filePaths[0], filename, outFilename, outFilePath, id, crf: 22, thumbnail }
   }
 }
 
@@ -79,12 +167,37 @@ async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
   }
 }
 
+async function getThumbnail(filePath) {
+  const filename = returnFileName(filePath)
+  const writePath = path.join(__dirname, filename + 'T.jpeg')
+  return new Promise((resolve) => {
+    exec(
+      `${ffmpegTruePath} -i "${filePath}" -vf scale=-1:200 -vframes 1 "${writePath}"`,
+      (err, stdout) => {
+        if (err) {
+          resolve(false)
+          console.log(err)
+          return
+        }
+        fs.readFile(writePath, (err, filedata) => {
+          if (err) {
+            console.log(err)
+            resolve(err)
+          }
+          resolve(filedata)
+          fs.unlinkSync(writePath)
+        })
+      }
+    )
+  })
+}
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
+    icon: icon,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {

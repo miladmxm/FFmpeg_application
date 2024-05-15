@@ -10,8 +10,8 @@ function App() {
     })
     window.electron.ipcRenderer.on('selectDirectoryAndFileNameToSave', (_, args) => {
       console.log(args)
-      setVideos(prev=>{
-        return {...prev,[args.id]:{...prev[args.id],...args}}
+      setVideos((prev) => {
+        return { ...prev, [args.id]: { ...prev[args.id], ...args } }
       })
     })
   }, [])
@@ -51,9 +51,12 @@ function App() {
           <div className="flex flex-col gap-5">
             {Object.keys(videos).map((videoKey) => {
               const videoItem = videos[videoKey]
+        
+              // const src = 'data:image/jpeg;base64,' + videoItem.thumbnail.toString('base64')
               return (
                 <div className="border-gray-3 rounded-xl border-2 p-2" key={videoKey}>
                   <div className="flex justify-between">
+                    {/* <img src={src} alt="" /> */}
                     <div className="flex-1 border-l border-solid max-w-[50%] p-2 flex gap-2">
                       <span className="text-white-mute font-light min-w-fit">نام:</span>
                       <span className="truncate">{videoItem.filename}</span>
