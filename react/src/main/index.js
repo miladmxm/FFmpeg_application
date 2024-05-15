@@ -81,18 +81,6 @@ async function runCRFffmpeg({ outFilePath, outFilename, filePath, crf, id }) {
         console.log(`child process exited with code ${code}`)
       }
     })
-
-    // exec(
-    //   `${ffmpegTruePath} -i "${filePath}" -vcodec libx265 -crf ${crf} "${outFilePath}${outFilename}"`,
-    //   (err, stdout) => {
-    //     console.log(stdout)
-    //     if (err) {
-    //       resolve(false)
-    //       return
-    //     }
-    //     resolve(`stdout: ${stdout}`)
-    //   }
-    // )
   })
 }
 runCRFffmpeg({
