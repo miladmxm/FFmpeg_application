@@ -22,6 +22,14 @@ function App() {
         }
       })
     })
+    window.electron.ipcRenderer.on('resetStatus', (_, args) => {
+      setVideos((prev) => {
+        return {
+          ...prev,
+          [args.id]: { ...prev[args.id], progress: 0, status: 'ready' }
+        }
+      })
+    })
     window.electron.ipcRenderer.on('selectDirectoryAndFileNameToSave', (_, args) => {
       console.log(args)
       setVideos((prev) => {
@@ -36,7 +44,13 @@ function App() {
       return { ...prev, [video.id]: { ...video } }
     })
   }
-
+  function deleteFromList(id) {
+    setVideos((prev) => {
+      const newItems = { ...prev }
+      delete newItems[id]
+      return newItems
+    })
+  }
   async function selectVideoOutPathAndName(id) {
     if (videos[id].status && (videos[id].status === 'doing' || videos[id].status === 'done')) {
       return
@@ -46,7 +60,9 @@ function App() {
       id
     })
   }
-
+  function abortProcess(id) {
+    window.electron.ipcRenderer.send('abortById', id)
+  }
   function CRFinputChange(e, id) {
     if (videos[id].status && (videos[id].status === 'doing' || videos[id].status === 'done')) {
       return
@@ -116,7 +132,7 @@ function App() {
               const videoItem = videos[videoKey]
               return (
                 <div
-                  className={`border-gray-3 rounded-xl border-2 p-2 ${videoItem.status === 'done' ? 'opacity-50 [&_*]:poi0nter-events-none' : ''}`}
+                  className={`border-gray-3 rounded-xl border-2 p-2 ${videoItem.status === 'done' ? 'opacity-50 [&_*]:pointer-events-none' : ''}`}
                   key={videoKey}
                 >
                   <div className="flex justify-between">
@@ -171,12 +187,14 @@ function App() {
                             <div
                               style={{ width: videoItem.progress + '%' }}
                               className="absolute transition-all bg-[#3b82f680] left-0 h-full top-0"
-                            ></div>
+                            >
+                              {videoItem.progress > 0 && <small>{videoItem.progress + '%'}</small>}
+                            </div>
                           </div>
                         )}
                         <div className="flex items-center gap-2">
                           {videoItem.status === 'doing' ? (
-                            <button className="text-red-400">
+                            <button onClick={() => abortProcess(videoKey)} className="text-red-400">
                               <FaPause />
                             </button>
                           ) : videoItem.status === 'done' ? (
@@ -185,7 +203,10 @@ function App() {
                             </>
                           ) : (
                             <>
-                              <button className="text-red-400">
+                              <button
+                                onClick={() => deleteFromList(videoKey)}
+                                className="text-red-400"
+                              >
                                 <FaTrash />
                               </button>
                               <button

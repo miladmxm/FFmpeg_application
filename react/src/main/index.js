@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
 import fs from 'fs'
 import path, { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,7 +8,12 @@ import { v4 as uuidv4 } from 'uuid'
 
 import icon from '../../resources/icon.png?asset'
 const ffmpegTruePath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
-
+function createNotification(title, body) {
+  new Notification({
+    title,
+    body
+  }).show()
+}
 function addMinToFileName(filename) {
   const arrayOfName = filename.split('.')
   arrayOfName[arrayOfName.length - 1] = '_min.' + arrayOfName[arrayOfName.length - 1]
@@ -20,19 +25,28 @@ function returnFileName(fullpath) {
   return filename[filename.length - 1]
 }
 
+const allProcess = {}
+
 async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id }) {
   return new Promise((resolve) => {
-    const child = spawn(ffmpegTruePath, [
-      '-i',
-      `${filePath}`,
-      '-vcodec',
-      'libx265',
-      '-crf',
-      `${crf}`,
-      `${outFilePath}${outFilename}`,
-      `-y`,
-      '-stats'
-    ])
+    const controller = new AbortController()
+    const { signal } = controller
+    allProcess[id] = { abort: () => controller.abort(), fullPath: outFilePath + outFilename }
+    const child = spawn(
+      ffmpegTruePath,
+      [
+        '-i',
+        `${filePath}`,
+        '-vcodec',
+        'libx265',
+        '-crf',
+        `${crf}`,
+        `${outFilePath}${outFilename}`,
+        `-y`,
+        '-stats'
+      ],
+      { signal }
+    )
 
     let stdOUTCunter = 0
     let videoDuration = 0
@@ -42,17 +56,16 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
 
     child.stderr.on('data', (data) => {
       const stringData = data.toString('utf-8')
-      if (stdOUTCunter === 1) {
+      if (videoDuration === 0) {
         const indexOfDurationInString = stringData.indexOf('Duration: ')
-
-        const indexOfStartInString = stringData.indexOf(', start')
-
-        const startSlice = indexOfDurationInString + 'Duration: '.length
-
-        videoDuration = stringData.slice(startSlice, indexOfStartInString)
-        videoDuration = videoDuration.replaceAll(':', '')
-        videoDuration = Number(videoDuration)
-      } else if (stdOUTCunter > 1) {
+        if (indexOfDurationInString > -1) {
+          const indexOfStartInString = stringData.indexOf(', start')
+          const startSlice = indexOfDurationInString + 'Duration: '.length
+          videoDuration = stringData.slice(startSlice, indexOfStartInString)
+          videoDuration = videoDuration.replaceAll(':', '')
+          videoDuration = Number(videoDuration)
+        }
+      } else {
         const startTimeIndex = stringData.indexOf('time=')
         if (startTimeIndex !== -1) {
           const bitrateForEndIndex = stringData.indexOf('bitrate')
@@ -62,7 +75,6 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
             progress = progress.replaceAll(':', '')
             progress = Number(progress)
             progress = Math.round((progress * 100) / videoDuration)
-
             event.reply('progress', { id, progress })
           }
         }
@@ -70,12 +82,22 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
       stdOUTCunter++
     })
     child.on('error', (error) => {
-      console.error(`error: ${error.message}`)
+      if (error.code === 'ABORT_ERR') {
+        event.reply('resetStatus', { id })
+        setTimeout(() => {
+          fs.unlinkSync(outFilePath + outFilename)
+        }, 2000)
+      }
     })
 
     child.on('close', (code) => {
       if (code === 0) {
+        delete allProcess[id]
         // todo send progress to frontend
+        createNotification(
+          'ذخیره شد',
+          `فایل مدنظر شما در مسیر ${outFilePath} با نام ${outFilename} ذخیره شد!`
+        )
         resolve(id)
         event.reply('done', { id })
         console.log(`child process exited with code ${code}`)
@@ -83,7 +105,14 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
     })
   })
 }
-
+async function abortById(_, id) {
+  try {
+    if (allProcess[id]) {
+      await allProcess[id].abort()
+      delete allProcess[id]
+    }
+  } catch (err) {}
+}
 async function runRtbufsizeFfmpeg(filePath, srcfilename, filename) {
   const outFilePath = filePath.replace(filePath, '')
   const outFilename = filename ? filename : addMinToFileName(srcfilename)
@@ -113,8 +142,16 @@ async function selectVideo() {
     const outFilename = addMinToFileName(filename)
     const outFilePath = filePaths[0].replace(filename, '')
     const id = uuidv4()
-    const thumbnail = await getThumbnail(filePaths[0])
-    return { filePath: filePaths[0], filename, outFilename, outFilePath, id, crf: 22, thumbnail }
+    // const thumbnail = await getThumbnail(filePaths[0])
+    return {
+      filePath: filePaths[0],
+      filename,
+      outFilename,
+      outFilePath,
+      id,
+      crf: 22,
+      thumbnail: null
+    }
   }
 }
 
@@ -193,16 +230,6 @@ function createWindow() {
   }
 }
 
-// todo add cancle handler
-// const { spawn } = require('node:child_process');
-// const controller = new AbortController();
-// const { signal } = controller;
-// const grep = spawn('grep', ['ssh'], { signal });
-// grep.on('error', (err) => {
-//   // This will be called with err being an AbortError if the controller aborts
-// });
-// controller.abort(); // Stops the child process
-
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
   app.on('browser-window-created', (_, window) => {
@@ -215,6 +242,7 @@ app.whenReady().then(() => {
   ipcMain.handle('selectVideo', selectVideo)
   ipcMain.on('selectDirectoryAndFileNameToSave', selectDirectoryAndFileNameToSave)
   ipcMain.on('startProcess', runCRFffmpeg)
+  ipcMain.on('abortById', abortById)
 
   createWindow()
   app.on('activate', function () {
