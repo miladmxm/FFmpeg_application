@@ -142,7 +142,7 @@ async function selectVideo() {
     const outFilename = addMinToFileName(filename)
     const outFilePath = filePaths[0].replace(filename, '')
     const id = uuidv4()
-    // const thumbnail = await getThumbnail(filePaths[0])
+    const thumbnail = await getThumbnail(filePaths[0])
     return {
       filePath: filePaths[0],
       filename,
@@ -150,7 +150,7 @@ async function selectVideo() {
       outFilePath,
       id,
       crf: 22,
-      thumbnail: null
+      thumbnail
     }
   } else {
     return null
@@ -158,7 +158,7 @@ async function selectVideo() {
 }
 
 async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
+  const { canceled, filePath } = await dialog.showSaveDialog({
     filters: [{ name: 'Videos', extensions: ['mp4'] }],
     title: 'مسیر مدنظر و نام آن را مشخص کنید',
     defaultPath,
@@ -166,10 +166,10 @@ async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
     properties: ['promptToCreate']
   })
   if (!canceled) {
-    const resultFilePath = filePaths[0].split('\\')
+    const resultFilePath = filePath.split('\\')
 
     const outFilename = resultFilePath[resultFilePath.length - 1]
-    const outFilePath = filePaths[0].replace(outFilename, '')
+    const outFilePath = filePath.replace(outFilename, '')
     console.log(outFilename, outFilePath)
     event.reply('selectDirectoryAndFileNameToSave', { outFilename, outFilePath, id })
     return { outFilename, outFilePath }
@@ -193,7 +193,11 @@ async function getThumbnail(filePath) {
             console.log(err)
             resolve(err)
           }
-          resolve(filedata)
+          const base64Image = filedata.toString('base64')
+          const mimeType = 'image/jpeg'
+          const dataURL = `data:${mimeType};base64,${base64Image}`
+
+          resolve(dataURL)
           fs.unlinkSync(writePath)
         })
       }

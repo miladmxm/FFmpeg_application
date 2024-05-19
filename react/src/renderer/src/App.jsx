@@ -40,6 +40,7 @@ function App() {
 
   async function selectVideo() {
     const video = await window.electron.ipcRenderer.invoke('selectVideo')
+    console.log(video)
     if (video) {
       setVideos((prev) => {
         return { ...prev, [video.id]: { ...video } }
@@ -138,7 +139,7 @@ function App() {
                   key={videoKey}
                 >
                   <div className="flex justify-between">
-                    {/* <img src={src} alt="" /> */}
+                    <img src={videoItem.thumbnail} alt="" />
                     <div className="flex-1 border-l border-gray-1 border-solid max-w-[50%] p-2 flex gap-2">
                       <span className="text-white-mute font-light min-w-fit">نام:</span>
                       <span className="truncate">{videoItem.filename}</span>

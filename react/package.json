@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "An Electron application with React for reduce video size by ffmpeg",
   "main": "./out/main/index.js",
-  "icon": "./resources/icon.ico",
+  "icon": "resources/icon.ico",
   "author": "miladmxm",
   "homepage": "https://miladmxm.com",
   "scripts": {
