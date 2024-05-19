@@ -152,6 +152,8 @@ async function selectVideo() {
       crf: 22,
       thumbnail: null
     }
+  } else {
+    return null
   }
 }
 

@@ -40,9 +40,11 @@ function App() {
 
   async function selectVideo() {
     const video = await window.electron.ipcRenderer.invoke('selectVideo')
-    setVideos((prev) => {
-      return { ...prev, [video.id]: { ...video } }
-    })
+    if (video) {
+      setVideos((prev) => {
+        return { ...prev, [video.id]: { ...video } }
+      })
+    }
   }
   function deleteFromList(id) {
     setVideos((prev) => {
