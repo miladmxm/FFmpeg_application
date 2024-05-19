@@ -129,7 +129,7 @@ function App() {
             ویدیو خود را انتخاب کنید
           </button>
         </form>
-        <section className="p-2 overflow-y-auto max-h-[60svh]">
+        <section className="p-2 overflow-y-auto max-h-[70svh]">
           <div className="flex flex-col gap-5">
             {Object.keys(videos).map((videoKey) => {
               const videoItem = videos[videoKey]
