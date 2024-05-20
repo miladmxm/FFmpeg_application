@@ -188,21 +188,39 @@ async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
 }
 
 async function getThumbnail(filePath) {
-  const filename = returnFileName(filePath)
-  const writePath = path.join(__dirname, filename + 'T.jpg')
+  const writePath = filePath + uuidv4() + '.jpg'
   return new Promise((resolve) => {
-    exec(
-      // `${ffmpegTruePath} -i "${filePath}" -vf scale=-1:200 -vframes 1 "${writePath}"`,
-      `${ffmpegTruePath} -i "${filePath}" -vf "select=gte(n\\,30),scale=200:-1" -vsync vfr -frames:v 1 "${writePath}"`,
-      (err, stdout) => {
-        if (err) {
-          resolve(false)
-          console.log(err)
-          return
-        }
+    const child = spawn(ffmpegTruePath, [
+      '-i',
+      `${filePath}`,
+      '-vf',
+      'select=gte(n\\,30),scale=200:-1',
+      '-fps_mode',
+      `vfr`,
+      `-frames:v`,
+      `1`,
+      `${writePath}`,
+      `-y`
+    ])
+
+    child.stdout.on('data', (data) => {
+      // console.log(`stdout:\n${data}`)
+    })
+
+    child.stderr.on('data', (data) => {
+      // console.log(`stderr:\n${data}`)
+    })
+
+    child.on('error', (error) => {
+      resolve(false)
+      return
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
         fs.readFile(writePath, (err, filedata) => {
           if (err) {
-            resolve(false)
+            resolve(err.message)
           }
           const base64Image = filedata.toString('base64')
           const mimeType = 'image/jpeg'
@@ -212,7 +230,29 @@ async function getThumbnail(filePath) {
           fs.unlinkSync(writePath)
         })
       }
-    )
+    })
+    // exec(
+    //   // `${ffmpegTruePath} -i "${filePath}" -vf scale=-1:200 -vframes 1 "${writePath}"`,
+    //   `${ffmpegTruePath} -i "${filePath}" -vf "select=gte(n\\,30),scale=200:-1" -vsync vfr -frames:v 1 "${writePath}"`,
+    //   (err, stdout) => {
+    //     if (err) {
+    //       resolve(err.message)
+    //       return
+    //     }
+    //     fs.readFile(writePath, (err, filedata) => {
+    //       if (err) {
+    //         resolve(err.message)
+    //       }
+    //       const base64Image = filedata.toString('base64')
+    //       const mimeType = 'image/jpeg'
+    //       const dataURL = `data:${mimeType};base64,${base64Image}`
+
+    //       resolve(dataURL)
+
+    //       // fs.unlinkSync(writePath)
+    //     })
+    //   }
+    // )
   })
 }
 function createWindow() {

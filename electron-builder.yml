@@ -16,6 +16,9 @@ win:
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createStartMenuShortcut: true
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:

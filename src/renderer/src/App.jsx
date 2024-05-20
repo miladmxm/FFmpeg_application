@@ -214,7 +214,7 @@ function App() {
                   <div className="flex">
                     <div className="thumbnail border-l border-gray-1 border-solid p-2">
                       <img
-                        className="aspect-video rounded-lg min-w-32"
+                        className="aspect-video rounded-lg min-w-32 object-cover max-h-32"
                         src={videoItem.thumbnail}
                         alt=""
                       />
