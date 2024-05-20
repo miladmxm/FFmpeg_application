@@ -8,11 +8,21 @@ import { v4 as uuidv4 } from 'uuid'
 
 import icon from '../../resources/icon.png?asset'
 const ffmpegTruePath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
-function createNotification(title, body) {
-  new Notification({
+
+function openPathDir(pathDir) {
+  console.log(pathDir)
+  shell.openPath(pathDir).catch((err) => {
+    console.error('Failed to open folder:', err)
+  })
+}
+
+function createNotification(title, body, outPath) {
+  const notif = new Notification({
     title,
     body
-  }).show()
+  })
+  notif.on('click', () => openPathDir(outPath))
+  notif.show()
 }
 function addMinToFileName(filename) {
   const arrayOfName = filename.split('.')
@@ -96,7 +106,8 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
         // todo send progress to frontend
         createNotification(
           'ذخیره شد',
-          `فایل مدنظر شما در مسیر ${outFilePath} با نام ${outFilename} ذخیره شد!`
+          `فایل مدنظر شما در مسیر ${outFilePath} با نام ${outFilename} ذخیره شد!`,
+          outFilePath
         )
         resolve(id)
         event.reply('done', { id })
@@ -150,7 +161,7 @@ async function selectVideo() {
       outFilePath,
       id,
       crf: 22,
-      thumbnail
+      thumbnail: thumbnail ? thumbnail : ''
     }
   } else {
     return null
@@ -178,10 +189,11 @@ async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
 
 async function getThumbnail(filePath) {
   const filename = returnFileName(filePath)
-  const writePath = path.join(__dirname, filename + 'T.jpeg')
+  const writePath = path.join(__dirname, filename + 'T.jpg')
   return new Promise((resolve) => {
     exec(
-      `${ffmpegTruePath} -i "${filePath}" -vf scale=-1:200 -vframes 1 "${writePath}"`,
+      // `${ffmpegTruePath} -i "${filePath}" -vf scale=-1:200 -vframes 1 "${writePath}"`,
+      `${ffmpegTruePath} -i "${filePath}" -vf "select=gte(n\\,30),scale=200:-1" -vsync vfr -frames:v 1 "${writePath}"`,
       (err, stdout) => {
         if (err) {
           resolve(false)
@@ -190,8 +202,7 @@ async function getThumbnail(filePath) {
         }
         fs.readFile(writePath, (err, filedata) => {
           if (err) {
-            console.log(err)
-            resolve(err)
+            resolve(false)
           }
           const base64Image = filedata.toString('base64')
           const mimeType = 'image/jpeg'
@@ -246,6 +257,7 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   ipcMain.handle('selectVideo', selectVideo)
+  ipcMain.on('openOutDir', (_, outPath) => openPathDir(outPath))
   ipcMain.on('selectDirectoryAndFileNameToSave', selectDirectoryAndFileNameToSave)
   ipcMain.on('startProcess', runCRFffmpeg)
   ipcMain.on('abortById', abortById)

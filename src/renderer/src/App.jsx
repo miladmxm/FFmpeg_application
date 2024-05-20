@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { FaCheck, FaPause, FaPlay, FaTrash } from 'react-icons/fa'
+import { FaCheck, FaPause, FaPlay, FaTrash, FaPlus, FaUndo } from 'react-icons/fa'
 
 const numberRegex = /^\d+$/
 function App() {
   const [videos, setVideos] = useState({})
+  const [finished, setFinished] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     window.electron.ipcRenderer.on('progress', (_, args) => {
@@ -15,6 +17,9 @@ function App() {
       })
     })
     window.electron.ipcRenderer.on('done', (_, args) => {
+      setFinished((prev) => {
+        return [...prev, args.id]
+      })
       setVideos((prev) => {
         return {
           ...prev,
@@ -38,9 +43,29 @@ function App() {
     })
   }, [])
 
+  function resetFinished() {
+    if (finished.length > 0) {
+      const newVideos = { ...videos }
+      finished.forEach((id) => {
+        delete newVideos[id]
+      })
+      setFinished([])
+      setVideos(newVideos)
+    }
+  }
+
+  function openIdDir(id) {
+    if (videos[id] && videos[id].outFilePath && videos[id].status === 'done') {
+      window.electron.ipcRenderer.send('openOutDir', videos[id].outFilePath)
+    }
+  }
   async function selectVideo() {
+    if (isLoading) {
+      return
+    }
+    setIsLoading(true)
     const video = await window.electron.ipcRenderer.invoke('selectVideo')
-    console.log(video)
+    setIsLoading(false)
     if (video) {
       setVideos((prev) => {
         return { ...prev, [video.id]: { ...video } }
@@ -119,14 +144,56 @@ function App() {
   }
   return (
     <>
-      <main className="w-screen flex flex-col gap-10 h-screen max-w-3xl mx-auto text-text-1 p-4">
-        <form onSubmit={submitForm} className="flex flex-col gap-6 items-center">
+      <main className="w-screen relative flex flex-col gap-10 h-screen max-w-3xl mx-auto text-text-1 p-4">
+        {finished.length > 0 && (
+          <button
+            onClick={resetFinished}
+            className="absolute hover:ring-2 ring-gray-2 left-4 top-4 p-2 bg-gray-3 cursor-pointer z-10 transition-all rounded-full"
+          >
+            <FaUndo />
+          </button>
+        )}
+        <form
+          onSubmit={submitForm}
+          className={`transition-all
+        ${Object.keys(videos).length > 0 ? 'translate-y-0' : 'translate-y-[calc(50svh-100%)]'}
+       flex flex-col gap-6 items-center`}
+        >
           <button
             onClick={selectVideo}
-            className="hover:ring-4 ring-gray-2 transition-all p-3 rounded-lg bg-gray-3 w-fit"
+            className="hover:ring-4 ring-gray-2 transition-all flex items-center gap-2 p-3 rounded-lg bg-gray-3 w-fit"
             type="button"
           >
-            ویدیو خود را انتخاب کنید
+            {isLoading ? (
+              <>
+                صبر کنید
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-text-1"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              </>
+            ) : (
+              <>
+                ویدیو خود را اضافه کنید
+                <FaPlus className="text-text-1" />
+              </>
+            )}
           </button>
         </form>
         <section className="p-2 overflow-y-auto max-h-[70svh]">
@@ -135,36 +202,44 @@ function App() {
               const videoItem = videos[videoKey]
               return (
                 <div
-                  className={`border-gray-3 rounded-xl border-2 p-2 ${videoItem.status === 'done' ? 'opacity-50 [&_*]:pointer-events-none' : ''}`}
+                  className={`border-gray-3 relative rounded-xl border-2 p-2 ${videoItem.status === 'done' ? 'opacity-50' : ''}`}
                   key={videoKey}
                 >
-                  <div className="flex justify-between">
-                    <img src={videoItem.thumbnail} alt="" />
-                    <div className="flex-1 border-l border-gray-1 border-solid max-w-[50%] p-2 flex gap-2">
-                      <span className="text-white-mute font-light min-w-fit">نام:</span>
-                      <span className="truncate">{videoItem.filename}</span>
-                    </div>
+                  {videoItem.status === 'done' && (
                     <div
-                      className="flex-1 max-w-[50%] p-2 flex gap-2 cursor-pointer hover:ring-2 transition-all rounded"
-                      onClick={() => selectVideoOutPathAndName(videoKey)}
-                    >
-                      <span className="text-white-mute font-light min-w-fit">نام خروجی:</span>
-                      <span className="truncate">{videoItem.outFilename}</span>
+                      onClick={() => openIdDir(videoKey)}
+                      className="absolute w-full h-full left-0 top-0 cursor-pointer"
+                    ></div>
+                  )}
+                  <div className="flex">
+                    <div className="thumbnail border-l border-gray-1 border-solid p-2">
+                      <img
+                        className="aspect-video rounded-lg min-w-32"
+                        src={videoItem.thumbnail}
+                        alt=""
+                      />
+                    </div>
+                    <div className="flex-auto flex flex-col justify-between overflow-hidden p-2">
+                      <div className="flex gap-2 p-2">
+                        <span className="text-white-mute font-light min-w-fit">
+                          نام/آدرس ویدیو:
+                        </span>
+                        <span className="truncate">{videoItem.filePath}</span>
+                      </div>
+                      <div
+                        className="flex gap-2 cursor-pointer hover:ring-2 transition-all rounded p-2"
+                        onClick={() => selectVideoOutPathAndName(videoKey)}
+                      >
+                        <span className="text-white-mute font-light min-w-fit">
+                          نام/آدرس خروجی:
+                        </span>
+                        <span className="truncate">
+                          {videoItem.outFilePath + videoItem.outFilename}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex justify-between">
-                    <div className="flex-1 border-l border-solid border-gray-1 max-w-[50%] p-2 flex gap-2">
-                      <span className="text-white-mute font-light min-w-fit">آدرس ویدیو:</span>
-                      <span className="truncate">{videoItem.filePath}</span>
-                    </div>
-                    <div
-                      className="flex-1 max-w-[50%] p-2 flex gap-2 cursor-pointer hover:ring-2 transition-all rounded"
-                      onClick={() => selectVideoOutPathAndName(videoKey)}
-                    >
-                      <span className="text-white-mute font-light min-w-fit">آدرس خروجی:</span>
-                      <span className="truncate">{videoItem.outFilePath}</span>
-                    </div>
-                  </div>
+
                   <div className="border-t p-2 border-gray-1 border-solid space-y-4">
                     <h6>تنظیمات:</h6>
                     <div className="flex items-center justify-between gap-5">
