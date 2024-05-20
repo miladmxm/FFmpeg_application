@@ -10,10 +10,7 @@ import icon from '../../resources/icon.png?asset'
 const ffmpegTruePath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
 
 function openPathDir(pathDir) {
-  console.log(pathDir)
-  shell.openPath(pathDir).catch((err) => {
-    console.error('Failed to open folder:', err)
-  })
+  shell.showItemInFolder(pathDir)
 }
 
 function createNotification(title, body, outPath) {
@@ -107,7 +104,7 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
         createNotification(
           'ذخیره شد',
           `فایل مدنظر شما در مسیر ${outFilePath} با نام ${outFilename} ذخیره شد!`,
-          outFilePath
+          outFilePath + outFilename
         )
         resolve(id)
         event.reply('done', { id })

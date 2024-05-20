@@ -56,7 +56,10 @@ function App() {
 
   function openIdDir(id) {
     if (videos[id] && videos[id].outFilePath && videos[id].status === 'done') {
-      window.electron.ipcRenderer.send('openOutDir', videos[id].outFilePath)
+      window.electron.ipcRenderer.send(
+        'openOutDir',
+        videos[id].outFilePath + videos[id].outFilename
+      )
     }
   }
   async function selectVideo() {
