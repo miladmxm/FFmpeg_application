@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
 import fs from 'fs'
-import path, { join } from 'path'
+import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ffmpegPath from 'ffmpeg-static'
 import { exec, spawn } from 'child_process'
