@@ -228,28 +228,6 @@ async function getThumbnail(filePath) {
         })
       }
     })
-    // exec(
-    //   // `${ffmpegTruePath} -i "${filePath}" -vf scale=-1:200 -vframes 1 "${writePath}"`,
-    //   `${ffmpegTruePath} -i "${filePath}" -vf "select=gte(n\\,30),scale=200:-1" -vsync vfr -frames:v 1 "${writePath}"`,
-    //   (err, stdout) => {
-    //     if (err) {
-    //       resolve(err.message)
-    //       return
-    //     }
-    //     fs.readFile(writePath, (err, filedata) => {
-    //       if (err) {
-    //         resolve(err.message)
-    //       }
-    //       const base64Image = filedata.toString('base64')
-    //       const mimeType = 'image/jpeg'
-    //       const dataURL = `data:${mimeType};base64,${base64Image}`
-
-    //       resolve(dataURL)
-
-    //       // fs.unlinkSync(writePath)
-    //     })
-    //   }
-    // )
   })
 }
 function createWindow() {
