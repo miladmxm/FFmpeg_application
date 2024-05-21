@@ -142,7 +142,7 @@ async function runRtbufsizeFfmpeg(filePath, srcfilename, filename) {
 async function selectVideo() {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
-    filters: [{ name: 'Videos', extensions: ['mp4'] }]
+    filters: [{ name: 'Videos', extensions: ['mp4', 'mkv'] }]
   })
   if (!canceled) {
     let filename = filePaths[0].split('\\')
@@ -167,7 +167,7 @@ async function selectVideo() {
 
 async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
   const { canceled, filePath } = await dialog.showSaveDialog({
-    filters: [{ name: 'Videos', extensions: ['mp4'] }],
+    filters: [{ name: 'Videos', extensions: ['mp4', 'mkv'] }],
     title: 'مسیر مدنظر و نام آن را مشخص کنید',
     defaultPath,
     buttonLabel: 'اینجا',
