@@ -5,9 +5,12 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ffmpegPath from 'ffmpeg-static'
 import { exec, spawn } from 'child_process'
 import { v4 as uuidv4 } from 'uuid'
+import mime from 'mime-types'
 
 import icon from '../../resources/icon.png?asset'
 const ffmpegTruePath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
+
+const acceptingFormat = ['mp4', 'mkv']
 
 function openPathDir(pathDir) {
   shell.showItemInFolder(pathDir)
@@ -34,11 +37,11 @@ function returnFileName(fullpath) {
 
 const allProcess = {}
 
-async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id }) {
+async function runCRFffmpeg(event, { outFilePath, filePath, crf, id }) {
   return new Promise((resolve) => {
     const controller = new AbortController()
     const { signal } = controller
-    allProcess[id] = { abort: () => controller.abort(), fullPath: outFilePath + outFilename }
+    allProcess[id] = { abort: () => controller.abort(), fullPath: outFilePath }
     const child = spawn(
       ffmpegTruePath,
       [
@@ -48,7 +51,7 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
         'libx265',
         '-crf',
         `${crf}`,
-        `${outFilePath}${outFilename}`,
+        `${outFilePath}`,
         `-y`,
         '-stats'
       ],
@@ -92,7 +95,7 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
       if (error.code === 'ABORT_ERR') {
         event.reply('resetStatus', { id })
         setTimeout(() => {
-          fs.unlinkSync(outFilePath + outFilename)
+          fs.unlinkSync(outFilePath)
         }, 2000)
       }
     })
@@ -103,8 +106,8 @@ async function runCRFffmpeg(event, { outFilePath, outFilename, filePath, crf, id
         // todo send progress to frontend
         createNotification(
           'ذخیره شد',
-          `فایل مدنظر شما در مسیر ${outFilePath} با نام ${outFilename} ذخیره شد!`,
-          outFilePath + outFilename
+          `فایل مدنظر شما در مسیر ${outFilePath} ذخیره شد!`,
+          outFilePath
         )
         resolve(id)
         event.reply('done', { id })
@@ -121,45 +124,47 @@ async function abortById(_, id) {
     }
   } catch (err) {}
 }
-async function runRtbufsizeFfmpeg(filePath, srcfilename, filename) {
-  const outFilePath = filePath.replace(filePath, '')
-  const outFilename = filename ? filename : addMinToFileName(srcfilename)
-  return new Promise((resolve) => {
-    // -rtbufsize 1M for custom size
-    exec(
-      `${ffmpegTruePath} -i "${filePath}" -vcodec libx265 -crf 22 "${outFilePath}${outFilename}"`,
-      (err, stdout) => {
-        if (err) {
-          resolve(false)
-          return
-        }
-        resolve(`stdout: ${stdout}`)
-      }
-    )
-  })
+// async function runRtbufsizeFfmpeg(filePath, srcfilename, filename) {
+//   const outFilePath = filePath.replace(filePath, '')
+//   return new Promise((resolve) => {
+//     // -rtbufsize 1M for custom size
+//     exec(
+//       `${ffmpegTruePath} -i "${filePath}" -vcodec libx265 -crf 22 "${outFilePath}"`,
+//       (err, stdout) => {
+//         if (err) {
+//           resolve(false)
+//           return
+//         }
+//         resolve(`stdout: ${stdout}`)
+//       }
+//     )
+//   })
+// }
+
+async function initialVideoDataFromPath(filePath) {
+  let filename = filePath.split('\\')
+  filename = filename[filename.length - 1]
+  const outFilename = addMinToFileName(filename)
+  const outFilePath = filePath.replace(filename, '') + outFilename
+  const id = uuidv4()
+  const thumbnail = await getThumbnail(filePath)
+  return {
+    filePath: filePath,
+    filename,
+    outFilePath,
+    id,
+    crf: 22,
+    thumbnail: thumbnail ? thumbnail : ''
+  }
 }
 
 async function selectVideo() {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
-    filters: [{ name: 'Videos', extensions: ['mp4', 'mkv'] }]
+    filters: [{ name: 'Videos', extensions: acceptingFormat }]
   })
   if (!canceled) {
-    let filename = filePaths[0].split('\\')
-    filename = filename[filename.length - 1]
-    const outFilename = addMinToFileName(filename)
-    const outFilePath = filePaths[0].replace(filename, '')
-    const id = uuidv4()
-    const thumbnail = await getThumbnail(filePaths[0])
-    return {
-      filePath: filePaths[0],
-      filename,
-      outFilename,
-      outFilePath,
-      id,
-      crf: 22,
-      thumbnail: thumbnail ? thumbnail : ''
-    }
+    return await initialVideoDataFromPath(filePaths[0])
   } else {
     return null
   }
@@ -167,20 +172,15 @@ async function selectVideo() {
 
 async function selectDirectoryAndFileNameToSave(event, { defaultPath, id }) {
   const { canceled, filePath } = await dialog.showSaveDialog({
-    filters: [{ name: 'Videos', extensions: ['mp4', 'mkv'] }],
+    filters: [{ name: 'Videos', extensions: acceptingFormat }],
     title: 'مسیر مدنظر و نام آن را مشخص کنید',
     defaultPath,
     buttonLabel: 'اینجا',
     properties: ['promptToCreate']
   })
   if (!canceled) {
-    const resultFilePath = filePath.split('\\')
-
-    const outFilename = resultFilePath[resultFilePath.length - 1]
-    const outFilePath = filePath.replace(outFilename, '')
-    console.log(outFilename, outFilePath)
-    event.reply('selectDirectoryAndFileNameToSave', { outFilename, outFilePath, id })
-    return { outFilename, outFilePath }
+    event.reply('selectDirectoryAndFileNameToSave', { outFilePath: filePath, id })
+    return { outFilePath: filePath }
   }
 }
 
@@ -230,6 +230,20 @@ async function getThumbnail(filePath) {
     })
   })
 }
+
+async function dropFiles(event, filePath) {
+  const filetype = mime.lookup(filePath)
+  let fileExt = filePath.split('.')
+  fileExt = fileExt[fileExt.length - 1]
+  if (
+    (filetype === 'video/mp4' && fileExt === 'mp4') ||
+    (filetype === 'video/x-matroska' && fileExt === 'mkv')
+  ) {
+    const videoData = await initialVideoDataFromPath(filePath)
+    event.reply('selectedVideo', videoData)
+  }
+}
+
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -276,7 +290,7 @@ app.whenReady().then(() => {
   ipcMain.on('selectDirectoryAndFileNameToSave', selectDirectoryAndFileNameToSave)
   ipcMain.on('startProcess', runCRFffmpeg)
   ipcMain.on('abortById', abortById)
-
+  ipcMain.on('dropFiles', dropFiles)
   createWindow()
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

@@ -2,12 +2,40 @@ import { useEffect, useState } from 'react'
 import { FaCheck, FaPause, FaPlay, FaTrash, FaPlus, FaUndo } from 'react-icons/fa'
 
 const numberRegex = /^\d+$/
+
 function App() {
   const [videos, setVideos] = useState({})
   const [finished, setFinished] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
+  const [DandDStatus, setDandDStatus] = useState('')
+  console.log(DandDStatus)
   useEffect(() => {
+    document.addEventListener('drop', async (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      for (const f of event.dataTransfer.files) {
+        await window.electron.ipcRenderer.send('dropFiles', f.path)
+        setDandDStatus('drop')
+      }
+    })
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      // setDandDStatus('')
+    })
+
+    document.addEventListener('dragenter', (event) => {
+      console.log('dragenter')
+      setDandDStatus('dragenter')
+    })
+
+    document.addEventListener('dragleave', (event) => {
+      console.log('dragleave')
+      setDandDStatus('')
+    })
+
     window.electron.ipcRenderer.on('progress', (_, args) => {
       setVideos((prev) => {
         return {
@@ -41,6 +69,11 @@ function App() {
         return { ...prev, [args.id]: { ...prev[args.id], ...args } }
       })
     })
+    window.electron.ipcRenderer.on('selectedVideo', (_, videoData) => {
+      setVideos((prev) => {
+        return { ...prev, [videoData.id]: { ...videoData } }
+      })
+    })
   }, [])
 
   function resetFinished() {
@@ -56,10 +89,7 @@ function App() {
 
   function openIdDir(id) {
     if (videos[id] && videos[id].outFilePath && videos[id].status === 'done') {
-      window.electron.ipcRenderer.send(
-        'openOutDir',
-        videos[id].outFilePath + videos[id].outFilename
-      )
+      window.electron.ipcRenderer.send('openOutDir', videos[id].outFilePath)
     }
   }
   async function selectVideo() {
@@ -87,7 +117,7 @@ function App() {
       return
     }
     await window.electron.ipcRenderer.send('selectDirectoryAndFileNameToSave', {
-      defaultPath: `${videos[id].outFilePath}${videos[id].outFilename}`,
+      defaultPath: `${videos[id].outFilePath}`,
       id
     })
   }
@@ -115,7 +145,7 @@ function App() {
   }
 
   async function startProcess(id) {
-    const { status, crf, filePath, outFilePath, outFilename } = videos[id]
+    const { status, crf, filePath, outFilePath } = videos[id]
     if (
       (status && status === 'doing') ||
       status === 'done' ||
@@ -136,7 +166,6 @@ function App() {
     await window.electron.ipcRenderer.send('startProcess', {
       filePath,
       outFilePath,
-      outFilename,
       crf,
       id
     })
@@ -148,6 +177,9 @@ function App() {
   return (
     <>
       <main className="w-screen relative flex flex-col gap-10 h-screen max-w-3xl mx-auto text-text-1 p-4">
+        {DandDStatus !== '' && (
+          <div className="fixed left-2 top-2 bottom-2 right-2 pointer-events-none rounded-xl z-20 backdrop-blur-sm border-green-400 border"></div>
+        )}
         {finished.length > 0 && (
           <button
             onClick={resetFinished}
@@ -236,9 +268,7 @@ function App() {
                         <span className="text-white-mute font-light min-w-fit">
                           نام/آدرس خروجی:
                         </span>
-                        <span className="truncate">
-                          {videoItem.outFilePath + videoItem.outFilename}
-                        </span>
+                        <span className="truncate">{videoItem.outFilePath}</span>
                       </div>
                     </div>
                   </div>
