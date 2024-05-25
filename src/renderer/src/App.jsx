@@ -8,34 +8,20 @@ function App() {
   const [finished, setFinished] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const [DandDStatus, setDandDStatus] = useState('')
-  console.log(DandDStatus)
   useEffect(() => {
     document.addEventListener('drop', async (event) => {
       event.preventDefault()
       event.stopPropagation()
       for (const f of event.dataTransfer.files) {
+        setIsLoading(true)
         await window.electron.ipcRenderer.send('dropFiles', f.path)
-        setDandDStatus('drop')
       }
     })
 
     document.addEventListener('dragover', (e) => {
       e.preventDefault()
       e.stopPropagation()
-      // setDandDStatus('')
     })
-
-    document.addEventListener('dragenter', (event) => {
-      console.log('dragenter')
-      setDandDStatus('dragenter')
-    })
-
-    document.addEventListener('dragleave', (event) => {
-      console.log('dragleave')
-      setDandDStatus('')
-    })
-
     window.electron.ipcRenderer.on('progress', (_, args) => {
       setVideos((prev) => {
         return {
@@ -64,12 +50,12 @@ function App() {
       })
     })
     window.electron.ipcRenderer.on('selectDirectoryAndFileNameToSave', (_, args) => {
-      console.log(args)
       setVideos((prev) => {
         return { ...prev, [args.id]: { ...prev[args.id], ...args } }
       })
     })
     window.electron.ipcRenderer.on('selectedVideo', (_, videoData) => {
+      setIsLoading(false)
       setVideos((prev) => {
         return { ...prev, [videoData.id]: { ...videoData } }
       })
@@ -174,12 +160,24 @@ function App() {
     e.preventDefault()
     console.log(e)
   }
+
+  function setFormat(id, format) {
+    if (videos[id].status && (videos[id].status === 'doing' || videos[id].status === 'done')) {
+      return
+    }
+    let newOutFormat = videos[id].outFilePath
+    newOutFormat = newOutFormat.split('.')
+    newOutFormat[newOutFormat.length - 1] = format
+    newOutFormat = newOutFormat.join('.')
+    setVideos((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], outFilePath: newOutFormat }
+    }))
+  }
+
   return (
     <>
       <main className="w-screen relative flex flex-col gap-10 h-screen max-w-3xl mx-auto text-text-1 p-4">
-        {DandDStatus !== '' && (
-          <div className="fixed left-2 top-2 bottom-2 right-2 pointer-events-none rounded-xl z-20 backdrop-blur-sm border-green-400 border"></div>
-        )}
         {finished.length > 0 && (
           <button
             onClick={resetFinished}
@@ -235,6 +233,10 @@ function App() {
           <div className="flex flex-col gap-5">
             {Object.keys(videos).map((videoKey) => {
               const videoItem = videos[videoKey]
+              let extFile = videoItem.outFilePath.split('.')
+
+              extFile = extFile[extFile.length - 1]
+
               return (
                 <div
                   className={`border-gray-3 relative rounded-xl border-2 p-2 ${videoItem.status === 'done' ? 'opacity-50' : ''}`}
@@ -291,6 +293,29 @@ function App() {
                           type="text"
                           value={videoItem.crf}
                         />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>فرمت خروجی:</span>
+                        <div className="flex items-center gap-1 [&>.active]:opacity-100 [&>.active]:ring-2">
+                          <button
+                            onClick={() => {
+                              setFormat(videoKey, 'mp4')
+                            }}
+                            type="button"
+                            className={`px-2 opacity-60 hover:ring-2 transition-all py-1 bg-black rounded-md ${extFile === 'mp4' ? 'active' : ''}`}
+                          >
+                            MP4
+                          </button>
+                          <button
+                            onClick={() => {
+                              setFormat(videoKey, 'mkv')
+                            }}
+                            type="button"
+                            className={`px-2 opacity-60 hover:ring-2 transition-all py-1 bg-black rounded-md ${extFile === 'mkv' ? 'active' : ''}`}
+                          >
+                            MKV
+                          </button>
+                        </div>
                       </div>
                       <div className="flex gap-2 flex-auto items-center justify-end">
                         {videoItem.status === 'doing' && (
