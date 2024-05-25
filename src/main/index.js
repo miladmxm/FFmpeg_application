@@ -3,11 +3,11 @@ import fs from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ffmpegPath from 'ffmpeg-static'
-import { exec, spawn } from 'child_process'
+import { spawn } from 'child_process'
 import { v4 as uuidv4 } from 'uuid'
 import mime from 'mime-types'
 
-import icon from '../../resources/icon.png?asset'
+import icon from '../../resources/icon.ico?asset'
 const ffmpegTruePath = ffmpegPath.replace('app.asar', 'app.asar.unpacked')
 
 const acceptingFormat = ['mp4', 'mkv']
@@ -30,10 +30,10 @@ function addMinToFileName(filename) {
   return arrayOfName.join('')
 }
 
-function returnFileName(fullpath) {
-  let filename = fullpath.split('\\')
-  return filename[filename.length - 1]
-}
+// function returnFileName(fullpath) {
+//   let filename = fullpath.split('\\')
+//   return filename[filename.length - 1]
+// }
 
 const allProcess = {}
 

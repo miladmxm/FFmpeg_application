@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+
 import { FaCheck, FaPause, FaPlay, FaTrash, FaPlus, FaUndo } from 'react-icons/fa'
 
 const numberRegex = /^\d+$/
@@ -7,14 +8,24 @@ function App() {
   const [videos, setVideos] = useState({})
   const [finished, setFinished] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [formatError, setFormatError] = useState(false)
 
   useEffect(() => {
     document.addEventListener('drop', async (event) => {
       event.preventDefault()
       event.stopPropagation()
       for (const f of event.dataTransfer.files) {
-        setIsLoading(true)
-        await window.electron.ipcRenderer.send('dropFiles', f.path)
+        let fileExt = f.path.split('.')
+        fileExt = fileExt[fileExt.length - 1]
+        if (fileExt === 'mp4' || fileExt === 'mkv') {
+          setIsLoading(true)
+          await window.electron.ipcRenderer.send('dropFiles', f.path)
+        } else {
+          setFormatError(true)
+          setTimeout(() => {
+            setFormatError(false)
+          }, 1000)
+        }
       }
     })
 
@@ -178,6 +189,9 @@ function App() {
   return (
     <>
       <main className="w-screen relative flex flex-col gap-10 h-screen max-w-3xl mx-auto text-text-1 p-4">
+        {formatError && (
+          <div className="fixed left-3 top-3 right-3 bottom-3 bg-transparent rounded-lg ring-2 ring-red-500 pointer-events-none z-20" />
+        )}
         {finished.length > 0 && (
           <button
             onClick={resetFinished}
