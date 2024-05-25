@@ -1,6 +1,6 @@
-# ffmpeg_with_react
+# MXReducer
 
-An Electron application with React
+MXReducer is a Windows-specific software that can significantly reduce the volume of videos using ffmpeg
 
 ## Recommended IDE Setup
 
@@ -25,10 +25,4 @@ $ npm run dev
 ```bash
 # For windows
 $ npm run build:win
-
-# For macOS
-$ npm run build:mac
-
-# For Linux
-$ npm run build:linux
 ```
