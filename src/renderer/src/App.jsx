@@ -295,14 +295,14 @@ function App() {
                       <div className="flex gap-2 items-center">
                         <span>ضریب نرخ ثابت(CRF):</span>
                         <input
-                          placeholder="یک عدد بین 1 تا 51"
+                          placeholder="1 تا 51"
                           onChange={(e) => CRFinputChange(e, videoKey)}
                           className={
                             videoItem.crf === ''
-                              ? 'ring-red-400 outline-none border-none bg-transparent ring-2 p-1 rounded'
+                              ? 'ring-red-400 outline-none border-none bg-transparent ring-2 p-1 rounded w-20 text-center'
                               : videoItem.crf > 17 && videoItem.crf < 29
-                                ? 'ring-green-400 outline-none border-none bg-transparent ring-2 p-1 rounded'
-                                : 'outline-none border-none bg-transparent ring-2 p-1 rounded'
+                                ? 'ring-green-400 outline-none border-none bg-transparent ring-2 p-1 rounded w-20 text-center'
+                                : 'outline-none border-none bg-transparent ring-2 p-1 rounded w-20 text-center'
                           }
                           type="text"
                           value={videoItem.crf}
